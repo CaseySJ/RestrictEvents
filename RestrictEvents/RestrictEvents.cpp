@@ -506,6 +506,19 @@ PluginConfiguration ADDPR(config) {
 		restrictEventsPolicy.policy.registerPolicy();
 		revassetIsSet = enableAssetPatching;
 		revsbvmmIsSet = enableSbvmmPatching;
+		SYSLOG("rev", "Casey - revsbvmm is %d \n", (int)revsbvmmIsSet);
+		DBGLOG("rev", "Casey - revsbvmm is %d \n", (int)revsbvmmIsSet);
+		
+		uint32_t b = 0, c = 0, d = 0;
+		CPUInfo::getCpuid(0, 0, nullptr, &b, &c, &d);
+		bool isAMD = (b == CPUInfo::signature_AMD_ebx && c == CPUInfo::signature_AMD_ecx && d == CPUInfo::signature_AMD_edx);
+		
+		if (isAMD) {
+			SYSLOG("rev", "Casey - Setting revsbvmmIsSet and revassetIsSet to False because AMD CPU\n");
+			DBGLOG("rev", "Casey - Setting revsbvmmIsSet and revassetIsSet to False because AMD CPU\n");
+			revsbvmmIsSet = false;
+			revassetIsSet = false;
+		}
 
 		if ((lilu.getRunMode() & LiluAPI::RunningNormal) != 0) {
 			if (enableMemoryUiPatching | enablePciUiPatching) {

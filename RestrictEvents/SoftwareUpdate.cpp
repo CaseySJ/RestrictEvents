@@ -172,7 +172,8 @@ void rerouteHvVmm(KernelPatcher &patcher) {
 		SYSLOG("supd", "failed to resolve kern.hv_vmm_present sysctl");
 		return;
 	}
-	
+	SYSLOG("supd", "Casey -- patching sysctl-cmm-present\n");
+	DBGLOG("supd", "Casey -- patching sysctl-cmm-present\n");
 	org_sysctl_vmm_present = patcher.routeFunction(reinterpret_cast<mach_vm_address_t>(vmm_present->oid_handler), reinterpret_cast<mach_vm_address_t>(my_sysctl_vmm_present), true);
 	if (!org_sysctl_vmm_present) {
 		SYSLOG("supd", "failed to route kern.hv_vmm_present sysctl");
