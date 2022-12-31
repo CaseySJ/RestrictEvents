@@ -57,6 +57,8 @@ static const void *modelFindPatch;
 static const void *modelReplPatch;
 static size_t modelFindSize;
 
+static bool isMacPro7;
+
 static bool needsMemPatch;
 static const char memFindPatch[] = "MacBookAir\0MacBookPro10";
 static const char memReplPatch[] = "HacBookAir\0HacBookPro10";
@@ -506,6 +508,8 @@ PluginConfiguration ADDPR(config) {
 		restrictEventsPolicy.policy.registerPolicy();
 		revassetIsSet = enableAssetPatching;
 		revsbvmmIsSet = enableSbvmmPatching;
+		
+#if 0
 		SYSLOG("rev", "Casey - revsbvmm is %d \n", (int)revsbvmmIsSet);
 		DBGLOG("rev", "Casey - revsbvmm is %d \n", (int)revsbvmmIsSet);
 		
@@ -519,7 +523,8 @@ PluginConfiguration ADDPR(config) {
 			revsbvmmIsSet = false;
 			revassetIsSet = false;
 		}
-
+#endif
+		
 		if ((lilu.getRunMode() & LiluAPI::RunningNormal) != 0) {
 			if (enableMemoryUiPatching | enablePciUiPatching) {
 				// Rename existing values to invalid ones to avoid matching.
@@ -548,6 +553,8 @@ PluginConfiguration ADDPR(config) {
 					binPathSystemInformation = getKernelVersion() >= KernelVersion::Catalina ? binPathSystemInformationCatalina : binPathSystemInformationLegacy;
 				}
 			}
+			
+			isMacPro7 = (strcmp(di.modelIdentifier, "MacPro7,1") == 0);
 
 			needsCpuNamePatch = enableCpuNamePatching ? RestrictEventsPolicy::needsCpuNamePatch() : false;
 			if (modelFindPatch != nullptr || needsCpuNamePatch || enableDiskArbitrationPatching ||
@@ -556,23 +563,26 @@ PluginConfiguration ADDPR(config) {
 				lilu.onPatcherLoadForce([](void *user, KernelPatcher &patcher) {
 					if (needsCpuNamePatch) RestrictEventsPolicy::calculatePatchedBrandString();
 					KernelPatcher::RouteRequest csRoute =
-						getKernelVersion() >= KernelVersion::BigSur ?
-						KernelPatcher::RouteRequest("_cs_validate_page", RestrictEventsPolicy::csValidatePageBigSur, orgCsValidateFunc) :
-							(getKernelVersion() >= KernelVersion::Sierra ?
-							KernelPatcher::RouteRequest("_cs_validate_range", RestrictEventsPolicy::csValidateRangeSierra, orgCsValidateFunc) :
-							KernelPatcher::RouteRequest("_cs_validate_page", RestrictEventsPolicy::csValidatePageMountainLion, orgCsValidateFunc));
+					getKernelVersion() >= KernelVersion::BigSur ?
+					KernelPatcher::RouteRequest("_cs_validate_page", RestrictEventsPolicy::csValidatePageBigSur, orgCsValidateFunc) :
+					(getKernelVersion() >= KernelVersion::Sierra ?
+					 KernelPatcher::RouteRequest("_cs_validate_range", RestrictEventsPolicy::csValidateRangeSierra, orgCsValidateFunc) :
+					 KernelPatcher::RouteRequest("_cs_validate_page", RestrictEventsPolicy::csValidatePageMountainLion, orgCsValidateFunc));
 					if (getKernelVersion() < KernelVersion::Sierra) {
 						vnodePagerOpsKernel = reinterpret_cast<void *>(patcher.solveSymbol(KernelPatcher::KernelID, "_vnode_pager_ops"));
 						if (!vnodePagerOpsKernel)
 							SYSLOG("rev", "failed to solve _vnode_pager_ops");
 					}
-
+					
 					if (!patcher.routeMultipleLong(KernelPatcher::KernelID, &csRoute, 1))
 						SYSLOG("rev", "failed to route cs validation pages");
-					if ((getKernelVersion() >= KernelVersion::Monterey ||
-						(getKernelVersion() == KernelVersion::BigSur && getKernelMinorVersion() >= 4)) &&
-						(revsbvmmIsSet || revassetIsSet))
-						rerouteHvVmm(patcher);
+					
+					if (!isMacPro7 || (isMacPro7 && getKernelVersion() < KernelVersion::Ventura)) {
+						if ((getKernelVersion() >= KernelVersion::Monterey ||
+							 (getKernelVersion() == KernelVersion::BigSur && getKernelMinorVersion() >= 4)) &&
+							(revsbvmmIsSet || revassetIsSet))
+							rerouteHvVmm(patcher);
+					}
 				});
 			}
 		}
